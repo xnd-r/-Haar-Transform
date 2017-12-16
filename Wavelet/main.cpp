@@ -1,51 +1,74 @@
 #include <iostream>
+#include "Wavelet_transform.h"
+#include <cmath>
 
-typedef double(*Haar)(int, int, int);
-typedef double(*signal)(double n);
+typedef double(*func)	(double t);
+typedef double(*_func)	(func, double, int, int);
+typedef double(*coef)	(func, _func, double, double, int, int);
 
-inline double __S(double _n) { return sin(_n); } //looks like discret sinus
+int m;//scale
+int k;//counter
+int N = 8;//amount of discret counts
+double step = 1. / N;
+double C[3][8];//array of coefs of direct conversion
+double sd[3];//discret recovered signal
 
-
-int n = 10;
-int N = 1024;
-
-double _phi_mkn(int m, int k, int n) //phi_m,k(n)
+inline double _input_signal(double _t) // continious signal for transformation
 {
-	double _sqrt = 1. / sqrt(pow(2, m));
-	double _t = pow(2, -m) * n - k;
-	int phi;
-
-	if (_t >= 0.  && _t <= 0.5) phi =  1;
-	if (_t >= 0.5 && _t <= 1.)  phi = -1;
-	if (_t < 0.	  || _t >  1.)  phi =  0;
-
-	return _sqrt * phi;
+	double _res;
+	(_t >= 0 && _t <= 1) ? _res = abs(sin(10 * _t) + 5 * _t) : _res = -1.;
+	return _res;
 }
 
-double _C_mk(int _N, int m, int k, Haar _h, signal _s) {
-	double res = 0.;
-
-	for (int n(0); n < _N; ++n) 
-	{
-		res += __S(n / _N) * _phi_mkn(m, k, n);
-	}
-	return res;
+inline double _phi_0(double _t) //Haar scaling
+{
+	int _res;
+	(_t >= 0 && _t <= 1) ? _res = 1 : _res = 0;
+	return _res;
 }
 
-double _approx(Haar h, signal s) {
-	double _res = 0.;
-	for(int m(0); m < n; m++)
+double _scaling_func(func _f, double _t, int _m, int _k)
+{
+	double _tmp = pow(2, _m) * _t - _k;
+	return pow(2, 0.5 * _m) * _f(_tmp);
+}
+
+void _calc_coefs(func _phi_0, func f, _func _f, double _step, int _m) //C(m,k) and sd[k]
+{
+	double underint_a, underint_b;
+	double _step_int = _step / 128;
+	double _trap;
+	for (int m(3); m < _m + 1; ++m)
 	{
-		for (int k(0); k < pow(2, n - m); k++)
+		int k(0);
+		for (; k < pow(2, m); ++k)
 		{
-			_res += _C_mk(N, m, k, h, s) * _phi_mkn(m, k, n);
+			double _res = 0.;
+
+			for (int i(0); i < 128; ++i)
+			{
+				underint_a = f(k * _step + i * _step_int) 
+							* _f(_phi_0, k * _step + i * _step_int, m, k);
+				underint_b = f(k * _step + (i + 1) * _step_int)
+					* _f(_phi_0, k * _step + (i + 1) * _step_int, m, k);
+				_trap = 0.5 * (underint_b + underint_a) * _step_int;
+				_res += _trap;
+			}
+			C[m][k] = _res;
+			sd[k] = _res * pow(2, 0.5 * m);
 		}
 	}
-	return _res; //finally answer
 }
 
-int main(int argc, void* argv[]) 
+int main(int argc, void* argv[])
 {
+		_calc_coefs(_phi_0, _input_signal, _scaling_func, step, 3);
 
+	for(int k(0); k < 8; ++k)
+	{
+		std::cout << _input_signal(k * step + 0.5 * step) << "    " << sd[k] << std::endl;
+	}
+
+	system("pause");
 	return 0;
 }
