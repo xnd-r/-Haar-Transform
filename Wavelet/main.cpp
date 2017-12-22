@@ -1,74 +1,77 @@
+#include "stdafx.h"
+#include "mpi.h"
+#include <math.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include <iostream>
-#include "Wavelet_transform.h"
-#include <cmath>
+#include "Wavelet_transformh.h"
+#include "omp.h"
+using namespace Wavelet_transform;
 
-typedef double(*func)	(double t);
-typedef double(*_func)	(func, double, int, int);
-typedef double(*coef)	(func, _func, double, double, int, int);
+int main(int argc, char* argv[]) {
+	
+	_m = 16;// atoi(argv[1]);
+	k = pow(2, _m);
+	N = k;
+	_step_ = 1. / N;
+	sd = new double[k];
+	C = new double[k];
 
-int m;//scale
-int k;//counter
-int N = 8;//amount of discret counts
-double step = 1. / N;
-double C[3][8];//array of coefs of direct conversion
-double sd[3];//discret recovered signal
+	sd_seq = new double[k];
+	C_seq = new double[k];
 
-inline double _input_signal(double _t) // continious signal for transformation
-{
-	double _res;
-	(_t >= 0 && _t <= 1) ? _res = abs(sin(10 * _t) + 5 * _t) : _res = -1.;
-	return _res;
-}
+	double _t1_seq, _t2_seq;
+	double _t1_par, _t2_par;
+	double t1, t2;
+	MPI_Init(&argc, &argv);
 
-inline double _phi_0(double _t) //Haar scaling
-{
-	int _res;
-	(_t >= 0 && _t <= 1) ? _res = 1 : _res = 0;
-	return _res;
-}
+	int ProcNum, ProcRank;
 
-double _scaling_func(func _f, double _t, int _m, int _k)
-{
-	double _tmp = pow(2, _m) * _t - _k;
-	return pow(2, 0.5 * _m) * _f(_tmp);
-}
+	MPI_Comm_size(MPI_COMM_WORLD, &ProcNum);
+	MPI_Comm_rank(MPI_COMM_WORLD, &ProcRank);
 
-void _calc_coefs(func _phi_0, func f, _func _f, double _step, int _m) //C(m,k) and sd[k]
-{
-	double underint_a, underint_b;
-	double _step_int = _step / 128;
-	double _trap;
-	for (int m(3); m < _m + 1; ++m)
+	if (ProcRank == 0)
 	{
-		int k(0);
-		for (; k < pow(2, m); ++k)
-		{
-			double _res = 0.;
-
-			for (int i(0); i < 128; ++i)
-			{
-				underint_a = f(k * _step + i * _step_int) 
-							* _f(_phi_0, k * _step + i * _step_int, m, k);
-				underint_b = f(k * _step + (i + 1) * _step_int)
-					* _f(_phi_0, k * _step + (i + 1) * _step_int, m, k);
-				_trap = 0.5 * (underint_b + underint_a) * _step_int;
-				_res += _trap;
-			}
-			C[m][k] = _res;
-			sd[k] = _res * pow(2, 0.5 * m);
-		}
+		_t1_seq = MPI_Wtime();
+		_calc_coefs_seq(_phi_0, _input_signal, _scaling_func, _step_, _m);
+		_t2_seq = MPI_Wtime();
+		t1 = _t2_seq - _t1_seq;
 	}
-}
+	_t1_par = MPI_Wtime();
+	_calc_coefs(_phi_0, _input_signal, _scaling_func, _step_, _m);
+	_t2_par = MPI_Wtime();
+	t2 = _t2_par - _t1_par;
 
-int main(int argc, void* argv[])
-{
-		_calc_coefs(_phi_0, _input_signal, _scaling_func, step, 3);
-
-	for(int k(0); k < 8; ++k)
+	if (ProcRank == 0)//comparation with err == 0.001;
 	{
-		std::cout << _input_signal(k * step + 0.5 * step) << "    " << sd[k] << std::endl;
+		std::cout << "is_C_equal: " << is_Ñ_equal(C, C_seq) << std::endl;
+		std::cout << "is_sd_equal: " << is_sd_equal(sd, sd_seq) << std::endl;
 	}
 
-	system("pause");
+	if (ProcRank == 0)
+	{
+		std::cout << "seq time" << std::endl;
+		std::cout << t1 << std::endl;
+		//std::cout.flush();
+		std::cout << "par time" << std::endl;
+		std::cout << t2 << std::endl;
+
+		//std::cout << "true val" << "   " << "par val" << "		" <<
+		//	"seq val" << "		" << "par C[k]" << "	" << "seq_C[k]" << std::endl;
+		//
+		//for (int i(0); i < k; ++i)
+		//{
+		//	std::cout << _input_signal(i * _step_ + 0.5 * _step_)
+		//		<< "    " << sd[i] << "		" << sd_seq[i] << "		"
+		//		<< C[i] << "		" << C_seq[i] << std::endl;
+		//	std::cout.flush();
+		//}
+		//std::cout << std::endl;
+	}
+
+	MPI_Finalize();
+	delete[] C;
+	delete[] sd;
 	return 0;
+
 }
