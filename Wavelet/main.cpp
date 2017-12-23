@@ -5,15 +5,13 @@
 #include <stdio.h>
 #include <iostream>
 #include "Wavelet_transformh.h"
-#include "omp.h"
-using namespace Wavelet_transform;
 
 int main(int argc, char* argv[]) {
 	
-	_m = 16;// atoi(argv[1]);
+	_m = atoi(argv[1]);
 	k = pow(2, _m);
-	N = k;
-	_step_ = 1. / N;
+	//N = k;
+	_step_ = 1. / k;
 	sd = new double[k];
 	C = new double[k];
 
@@ -56,17 +54,17 @@ int main(int argc, char* argv[]) {
 		std::cout << "par time" << std::endl;
 		std::cout << t2 << std::endl;
 
-		//std::cout << "true val" << "   " << "par val" << "		" <<
-		//	"seq val" << "		" << "par C[k]" << "	" << "seq_C[k]" << std::endl;
-		//
-		//for (int i(0); i < k; ++i)
-		//{
-		//	std::cout << _input_signal(i * _step_ + 0.5 * _step_)
-		//		<< "    " << sd[i] << "		" << sd_seq[i] << "		"
-		//		<< C[i] << "		" << C_seq[i] << std::endl;
-		//	std::cout.flush();
-		//}
-		//std::cout << std::endl;
+		std::cout << "true val" << "   " << "par val" << "		" <<
+			"seq val" << "		" << "par C[k]" << "	" << "seq_C[k]" << std::endl;
+		
+		for (int i(0); i < k; ++i)
+		{
+			std::cout << _input_signal(i * _step_ + 0.5 * _step_)
+				<< "    " << sd[i] << "		" << sd_seq[i] << "		"
+				<< C[i] << "		" << C_seq[i] << std::endl;
+			std::cout.flush();
+		}
+		std::cout << std::endl;
 	}
 
 	MPI_Finalize();
